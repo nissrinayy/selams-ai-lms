@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
@@ -9,53 +10,70 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-export default function Login() {
+export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [role, setRole] = useState<"student" | "teacher">("student");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validasi password
+    if (password !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Password dan konfirmasi password tidak sama",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password minimal 6 karakter",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Daftar user baru
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            display_name: displayName,
+            role: role,
+          },
+        },
       });
 
       if (error) throw error;
 
-      // Get user profile to check role
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single();
-
-      if (profileError) {
-        console.error('Profile error:', profileError);
-      }
-
       toast({
         title: "Berhasil!",
-        description: "Anda berhasil login",
+        description: "Akun berhasil dibuat. Silakan cek email untuk verifikasi.",
       });
 
-      // Redirect based on role
-      if (profile?.role === 'teacher') {
-        navigate("/teacher/dashboard");
-      } else {
-        navigate("/student/dashboard");
-      }
+      // Redirect ke login
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
 
     } catch (error: any) {
-      console.error("Login error:", error);
+      console.error("Registration error:", error);
       toast({
-        title: "Gagal Login",
-        description: error.message || "Email atau password salah",
+        title: "Gagal Mendaftar",
+        description: error.message || "Terjadi kesalahan saat mendaftar",
         variant: "destructive",
       });
     } finally {
@@ -63,7 +81,7 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignUp = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -92,13 +110,26 @@ export default function Login() {
             </div>
             <p className="text-sm text-muted-foreground mt-2">Smart Learning Management System</p>
           </div>
-          <CardTitle className="text-2xl">Selamat Datang Kembali</CardTitle>
+          <CardTitle className="text-2xl">Buat Akun Baru</CardTitle>
           <CardDescription>
-            Masuk ke akun Anda untuk melanjutkan belajar
+            Daftar untuk memulai perjalanan belajar Anda
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleRegister} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="displayName">Nama Lengkap</Label>
+              <Input
+                id="displayName"
+                type="text"
+                placeholder="John Doe"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -111,6 +142,24 @@ export default function Login() {
                 disabled={loading}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="role">Daftar Sebagai</Label>
+              <Select 
+                value={role} 
+                onValueChange={(value: "student" | "teacher") => setRole(value)}
+                disabled={loading}
+              >
+                <SelectTrigger id="role">
+                  <SelectValue placeholder="Pilih peran" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="student">Murid</SelectItem>
+                  <SelectItem value="teacher">Guru</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
@@ -121,16 +170,32 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={loading}
+                minLength={6}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Konfirmasi Password</Label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                disabled={loading}
+                minLength={6}
+              />
+            </div>
+
             <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Masuk...
+                  Mendaftar...
                 </>
               ) : (
-                "Masuk"
+                "Daftar"
               )}
             </Button>
           </form>
@@ -144,7 +209,14 @@ export default function Login() {
             </div>
           </div>
 
-          <Button variant="outline" className="w-full" size="lg" onClick={handleGoogleLogin} type="button" disabled={loading}>
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            size="lg"
+            onClick={handleGoogleSignUp}
+            type="button"
+            disabled={loading}
+          >
             <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -167,9 +239,9 @@ export default function Login() {
           </Button>
 
           <div className="text-center text-sm text-muted-foreground">
-            Belum punya akun?{" "}
-            <Link to="/register" className="font-semibold text-primary hover:underline">
-              Daftar sekarang
+            Sudah punya akun?{" "}
+            <Link to="/login" className="font-semibold text-primary hover:underline">
+              Masuk di sini
             </Link>
           </div>
         </CardContent>
